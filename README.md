@@ -19,3 +19,7 @@ You need the following R packages:
 # Usage
 
 Just open an R terminal in the parent folder (where *app.R* is located) and run: `shiny::runApp("app.R")`.
+
+# Example
+
+![](example.png)
