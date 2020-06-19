@@ -15,3 +15,7 @@ You need the following R packages:
   * You also need to download the PHYLACINE database in the parent folder.
   * Be sure the path to the ranges is: 'PHYLACINE_1.2/PHYLACINE_1.2-master/Data/Ranges' or change the file-path in *app.R*.
   * Traits table is read from the online GitHub repo, so no need to check that.
+
+# Usage
+
+Just open an R terminal in the parent folder (where *app.R* is located) and run: `shiny::runApp("app.R")`.
