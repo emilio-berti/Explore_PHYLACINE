@@ -8,7 +8,6 @@ You need the following R packages:
 
   1. shiny
   2. raster
-  3. tmap
   4. sf
   5. DT
 
