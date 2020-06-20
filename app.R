@@ -1,6 +1,5 @@
 library(shiny)
 library(raster)
-library(tmap)
 library(sf)
 library(DT)
 
@@ -10,17 +9,7 @@ Species <- phy$Binomial.1.2
 
 url <- "https://github.com/MegaPast2Future/PHYLACINE_1.2/blob/master/Data/Ranges/"
 
-r_tmp <- raster(
-  nrows = 142, ncols = 360,
-  crs = crs("+proj=cea +lon_0=0 +lat_ts=30 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"),
-  resolution = c(96486.27, 96514.96),
-  ext = extent(-17367529, 17367529, -6356742, 7348382)
-)
-
-data("World")
-w <- as_Spatial(World)
-w <- rasterize(w, r_tmp)
-w <- projectRaster(w, r_tmp)
+w <- raster("continents.tif")
 w[!is.na(w)] <- 1
 
 ui <- fluidPage(
@@ -35,6 +24,11 @@ ui <- fluidPage(
                        "Species",
                        choices = Species
            )
+    )),
+  fluidRow(
+    column(2,
+           checkboxInput("plot_cu",
+                         "Plot current range", value = TRUE)
     ),
     column(10,
            plotOutput("ranges")
@@ -71,12 +65,20 @@ server <- function(input, output) {
     par(mar = c(0, 0, 0, 0))
     plot(w, col = "grey80", box = FALSE, axes = FALSE, legend = FALSE)
     plot(pn(), col = "steelblue", add = TRUE, legend = FALSE)
-    plot(cu(), col = "gold2", add = TRUE, legend = FALSE)
+    if (input$plot_cu) {
+      plot(cu(), col = "gold2", add = TRUE, legend = FALSE)
+      legend(-1.5 * 10^7, -3 * 10^6, 
+             legend = c("Present-natural", "Current"), 
+             fill = c("steelblue", "gold2"),
+             border = c("steelblue", "gold2"),
+             box.lwd = 0, cex = 1.5)
+    } else {
     legend(-1.5 * 10^7, -3 * 10^6, 
-           legend = c("Present-natural", "Current"), 
-           fill = c("steelblue", "gold2"),
-           border = c("steelblue", "gold2"),
+           legend = c("Present-natural"), 
+           fill = c("steelblue"),
+           border = c("steelblue"),
            box.lwd = 0, cex = 1.5)
+    }
   })
   fam_tab <- reactive({
     phy[phy$Family.1.2 == input$family, c("Order.1.2", "Family.1.2", "Binomial.1.2", "Mass.g", "IUCN.Status.1.2")]
