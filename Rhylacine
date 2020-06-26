@@ -1,0 +1,3 @@
+#!/user/bin/R
+
+shiny::runApp("/home/GIT/Explore_PHYLACINE/app.R")

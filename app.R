@@ -10,11 +10,11 @@ Family <- unique(phy$Family.1.2)
 
 # used for ranges
 url <- "/vsicurl/https://github.com/MegaPast2Future/PHYLACINE_1.2/blob/master/Data/Ranges/"
+path <- file.path("PHYLACINE_1.2", "PHYLACINE_1.2-master", "Data", "Ranges")
 
 # base raster for plot - grey world, no antarctica
 w <- raster("continents.tif")
 w[!is.na(w)] <- 1
-
 
 ## define UI for shiny
 ui <- fluidPage(
@@ -49,7 +49,10 @@ ui <- fluidPage(
     # - matching family to the input species
     column(2,
            uiOutput("family_table_select")  # defined in server
-    ),
+    )
+  ),
+  br(),
+  fluidRow(
     column(10,
            dataTableOutput('family_table')
     )
@@ -59,23 +62,21 @@ ui <- fluidPage(
 ## define server for shiny
 server <- function(input, output) {
   species <- reactive(input$species)
-  
-  # get current range raster
   cu <- reactive({
-    r.cu <- raster(sprintf('%sCurrent/%s.tif?raw=true', url, species()))
+    r.cu <- raster(paste0(path, "/Current/", species(), ".tif"))
     r.cu[r.cu == 0] <- NA
     r.cu
   })
   # get present-natural raster
   pn <- reactive({
-    r.pn <- raster(sprintf('%sPresent_natural/%s.tif?raw=true', url, species()))
+    r.pn <- raster(paste0(path, "/Present_natural/", species(), ".tif"))
     r.pn[r.pn == 0] <- NA
     r.pn
   })
   # calculate overlay raster with 1=cu, 2=pn, 3=overlay, 0=NA
   ol <- reactive({
-    r.cu <- raster(sprintf('%sCurrent/%s.tif?raw=true', url, species()))
-    r.pn <- raster(sprintf('%sPresent_natural/%s.tif?raw=true', url, species()))
+    r.cu <- cu()
+    r.pn <- pn()
     r.pn[r.pn == 1] <- 2
     # overlay = current AND present-natural
     ol <- r.cu + r.pn
@@ -85,7 +86,7 @@ server <- function(input, output) {
   output$ranges <- renderPlot({
     par(mar = c(0, 0, 0, 0))
     plot(w, col = "grey80", box = FALSE, axes = FALSE, legend = FALSE)  # base plot, no ranges
-    
+    # conditional plot
     if (input$plot_range == "Combined") {  # plot both ranges + overlay
       # order colors so they match with order of any raster
       var.order <- unique(values(ol()))[!is.na(unique(values(ol())))]
@@ -113,8 +114,8 @@ server <- function(input, output) {
              box.lwd = 0, cex = 1.5)
     }
   })
-  
-  # using renderUI to make dynamic input (i.e. it changes the family based on the input species)
+  # using renderUI to make dynamic input (i.e. it changes the family based on
+  # the input species)
   output$family_table_select <- renderUI({
     family_fits <- phy[phy$Binomial.1.2==species(), "Family.1.2"]
     selectizeInput("family",
@@ -123,7 +124,9 @@ server <- function(input, output) {
                    selected = family_fits)
   })
   fam_tab <- reactive({
-    phy[phy$Family.1.2 == input$family, c("Order.1.2", "Family.1.2", "Binomial.1.2", "Mass.g", "IUCN.Status.1.2")]
+    phy[phy$Family.1.2 == input$family, c("Order.1.2", "Family.1.2", 
+                                          "Binomial.1.2", "Mass.g", 
+                                          "IUCN.Status.1.2")]
   })
   output$family_table <- renderDataTable(fam_tab())
 }
