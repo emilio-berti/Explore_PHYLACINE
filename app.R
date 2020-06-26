@@ -3,15 +3,20 @@ library(raster)
 library(sf)
 library(DT)
 
-
+# used for data table
 phy <- read.csv("https://raw.githubusercontent.com/MegaPast2Future/PHYLACINE_1.2/master/Data/Traits/Trait_data.csv", sep = ",")
 Species <- phy$Binomial.1.2
+Family <- unique(phy$Family.1.2)
 
-url <- "https://github.com/MegaPast2Future/PHYLACINE_1.2/blob/master/Data/Ranges/"
+# used for ranges
+url <- "/vsicurl/https://github.com/MegaPast2Future/PHYLACINE_1.2/blob/master/Data/Ranges/"
 
+# base raster for plot - grey world, no antarctica
 w <- raster("continents.tif")
 w[!is.na(w)] <- 1
 
+
+## define UI for shiny
 ui <- fluidPage(
   column(3, offset = 4, 
          titlePanel("",
@@ -20,15 +25,19 @@ ui <- fluidPage(
   fluidRow(
     h3("Geographic range"),
     column(2,
-           selectInput("species",
-                       "Species",
-                       choices = Species
+           selectizeInput("species",  # selectizeInput makes writable and searchable dropdown menu
+                          "Species",
+                          choices = Species, 
+                          selected = "Canis_lupus"  # default is wolf
            )
-    )),
+    )
+  ),
   fluidRow(
     column(2,
-           checkboxInput("plot_cu",
-                         "Plot current range", value = TRUE)
+           radioButtons("plot_range", 
+                        "Range to Plot", 
+                        choices=c("Current", "Present-natural", "Combined")
+           )
     ),
     column(10,
            plotOutput("ranges")
@@ -36,49 +45,82 @@ ui <- fluidPage(
   ),
   fluidRow(
     h3("PHYLACINE Table"),
+    # using uiOutput to have dynamic change of input to table
+    # - matching family to the input species
     column(2,
-           textInput("family",
-                     "Family",
-                     value = "")),
+           uiOutput("family_table_select")  # defined in server
+    ),
     column(10,
-           dataTableOutput('family_table'))
+           dataTableOutput('family_table')
+    )
   )
 )
 
+## define server for shiny
 server <- function(input, output) {
   species <- reactive(input$species)
-  pn <- reactive({
-    r <- file.path("PHYLACINE_1.2", "PHYLACINE_1.2-master", "Data", "Ranges",
-                   "Present_natural", paste0(species(), ".tif"))
-    r <- raster(r)
-    r[r == 0] <- NA
-    r
-  })
+  
+  # get current range raster
   cu <- reactive({
-    r <- file.path("PHYLACINE_1.2", "PHYLACINE_1.2-master", "Data", "Ranges",
-                   "Current", paste0(species(), ".tif"))
-    r <- raster(r)
-    r[r == 0] <- NA
-    r
+    r.cu <- raster(sprintf('%sCurrent/%s.tif?raw=true', url, species()))
+    r.cu[r.cu == 0] <- NA
+    r.cu
+  })
+  # get present-natural raster
+  pn <- reactive({
+    r.pn <- raster(sprintf('%sPresent_natural/%s.tif?raw=true', url, species()))
+    r.pn[r.pn == 0] <- NA
+    r.pn
+  })
+  # calculate overlay raster with 1=cu, 2=pn, 3=overlay, 0=NA
+  ol <- reactive({
+    r.cu <- raster(sprintf('%sCurrent/%s.tif?raw=true', url, species()))
+    r.pn <- raster(sprintf('%sPresent_natural/%s.tif?raw=true', url, species()))
+    r.pn[r.pn == 1] <- 2
+    # overlay = current AND present-natural
+    ol <- r.cu + r.pn
+    ol[ol == 0] <- NA
+    ol
   })
   output$ranges <- renderPlot({
     par(mar = c(0, 0, 0, 0))
-    plot(w, col = "grey80", box = FALSE, axes = FALSE, legend = FALSE)
-    plot(pn(), col = "steelblue", add = TRUE, legend = FALSE)
-    if (input$plot_cu) {
+    plot(w, col = "grey80", box = FALSE, axes = FALSE, legend = FALSE)  # base plot, no ranges
+    
+    if (input$plot_range == "Combined") {  # plot both ranges + overlay
+      # order colors so they match with order of any raster
+      var.order <- unique(values(ol()))[!is.na(unique(values(ol())))]
+      var.colors <- c("gold2", "steelblue", "green3")[match(var.order, c(1,2,3))]
+      # plot and legend
+      plot(ol(), col = var.colors, add = TRUE, legend = FALSE)
+      legend(-1.5 * 10^7, -3 * 10^6, 
+             legend = c("Present-natural", "Current", "Overlap"), 
+             fill = c("steelblue", "gold2", "green3"),
+             border = c("steelblue", "gold2", "green3"),
+             box.lwd = 0, cex = 1.5)
+    } else if (input$plot_range == "Current") {  # plot only current range
       plot(cu(), col = "gold2", add = TRUE, legend = FALSE)
       legend(-1.5 * 10^7, -3 * 10^6, 
-             legend = c("Present-natural", "Current"), 
-             fill = c("steelblue", "gold2"),
-             border = c("steelblue", "gold2"),
+             legend = c("Current"), 
+             fill = c("gold2"),
+             border = c("gold2"),
              box.lwd = 0, cex = 1.5)
-    } else {
-    legend(-1.5 * 10^7, -3 * 10^6, 
-           legend = c("Present-natural"), 
-           fill = c("steelblue"),
-           border = c("steelblue"),
-           box.lwd = 0, cex = 1.5)
+    } else if (input$plot_range == "Present-natural") {  # plot only present natural range
+      plot(pn(), col = "steelblue", add = TRUE, legend = FALSE)
+      legend(-1.5 * 10^7, -3 * 10^6, 
+             legend = c("Present-natural"), 
+             fill = c("steelblue"),
+             border = c("steelblue"),
+             box.lwd = 0, cex = 1.5)
     }
+  })
+  
+  # using renderUI to make dynamic input (i.e. it changes the family based on the input species)
+  output$family_table_select <- renderUI({
+    family_fits <- phy[phy$Binomial.1.2==species(), "Family.1.2"]
+    selectizeInput("family",
+                   "Family",
+                   choices = Family,
+                   selected = family_fits)
   })
   fam_tab <- reactive({
     phy[phy$Family.1.2 == input$family, c("Order.1.2", "Family.1.2", "Binomial.1.2", "Mass.g", "IUCN.Status.1.2")]
@@ -88,4 +130,3 @@ server <- function(input, output) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
