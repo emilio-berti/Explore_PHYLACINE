@@ -4,13 +4,13 @@ library(sf)
 library(DT)
 
 # used for data table
-phy <- read.csv("https://raw.githubusercontent.com/MegaPast2Future/PHYLACINE_1.2/master/Data/Traits/Trait_data.csv", sep = ",")
+phy <- read.csv("PHYLACINE_1.2-master/Data/Traits/Trait_data.csv")
 Species <- phy$Binomial.1.2
 Family <- unique(phy$Family.1.2)
 
-# used for ranges
+# used for ranges - not stable
 url <- "/vsicurl/https://github.com/MegaPast2Future/PHYLACINE_1.2/blob/master/Data/Ranges/"
-path <- file.path("PHYLACINE_1.2", "PHYLACINE_1.2-master", "Data", "Ranges")
+path <- file.path("PHYLACINE_1.2-master", "Data", "Ranges")
 
 # base raster for plot - grey world, no antarctica
 w <- raster("continents.tif")
@@ -79,7 +79,7 @@ server <- function(input, output) {
     r.pn <- pn()
     r.pn[r.pn == 1] <- 2
     # overlay = current AND present-natural
-    ol <- r.cu + r.pn
+    ol <- sum(r.cu, r.pn, na.rm = TRUE)
     ol[ol == 0] <- NA
     ol
   })
